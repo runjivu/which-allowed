@@ -114,57 +114,177 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
     let client = aws_sdk_iam::Client::new(&sdk_config);
     let args = WhichAllowedArgs::parse();
 
-    let attached_policies = match args.entity_type {
+    let attached_policy_pairs: Vec<(String, String)> = match args.entity_type {
         EntityType::User => {
-            match iam_service::list_attached_user_policies(&client, args.entity_name).await {
-                Ok(r) => r,
-                Err(e) => panic!("{:?}", e),
+            // user attached managed policy (both aws and customer managed)
+            let user_managed_p =
+                iam_service::list_attached_user_policies(&client, &args.entity_name)
+                    .await
+                    .unwrap()
+                    .unwrap();
+
+            let user_managed_p_document = user_managed_p.iter().map(|a_p| async {
+                let policy = iam_service::get_policy(&client, a_p.clone()).await.unwrap();
+                let policy_document = iam_service::get_policy_version(&client, policy)
+                    .await
+                    .unwrap()
+                    .document
+                    .unwrap();
+                policy_document
+            });
+            let mut user_managed_p_document: Vec<String> = join_all(user_managed_p_document).await;
+
+            let mut user_managed_p_name: Vec<String> = user_managed_p
+                .iter()
+                .map(|p| p.policy_name.clone().unwrap())
+                .collect();
+
+            // user attached inline policy
+            let mut user_inline_p_name = iam_service::list_user_policies(&client, &args.entity_name)
+                .await
+                .unwrap();
+
+            let user_inline_p_document = user_inline_p_name.iter().map(|p_n| async {
+                let policy_document = iam_service::get_user_policy(&client, &args.entity_name, p_n)
+                    .await
+                    .unwrap();
+                policy_document
+            });
+            let mut user_inline_p_document: Vec<String> = join_all(user_inline_p_document).await;
+
+            // group attached managed policies
+            let groups = iam_service::list_groups_for_user(&client, &args.entity_name)
+                .await
+                .unwrap();
+
+            let mut group_managed_p: Vec<AttachedPolicy> = Vec::new();
+            for group in groups.clone() {
+                let mut p = iam_service::list_attached_group_policies(&client, &group)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                group_managed_p.append(&mut p);
             }
+
+            let group_managed_p_document = group_managed_p.iter().map(|a_p| async {
+                let policy = iam_service::get_policy(&client, a_p.clone()).await.unwrap();
+                let policy_document = iam_service::get_policy_version(&client, policy)
+                    .await
+                    .unwrap()
+                    .document
+                    .unwrap();
+                policy_document
+            });
+            let mut group_managed_p_document = join_all(group_managed_p_document).await;
+
+            let mut group_managed_p_name: Vec<String> = group_managed_p
+                .iter()
+                .map(|a_p| a_p.policy_name.clone().unwrap())
+                .collect();
+
+            // group attached inline policies
+            let mut group_inline_p_name: Vec<String> = Vec::new();
+            let mut group_inline_p_document: Vec<String> = Vec::new();
+            for group in groups {
+                let mut p_n = iam_service::list_group_policies(&client, &group)
+                    .await
+                    .unwrap();
+
+                let p_d = p_n.iter().map(|p_n| async {
+                    iam_service::get_group_policy(&client, &group, p_n)
+                        .await
+                        .unwrap()
+                });
+                let mut p_d = join_all(p_d).await;
+
+                group_inline_p_name.append(&mut p_n);
+                group_inline_p_document.append(&mut p_d);
+            }
+
+            let mut user_p_name: Vec<String> = Vec::new();
+            user_p_name.append(&mut user_managed_p_name);
+            user_p_name.append(&mut user_inline_p_name);
+            user_p_name.append(&mut group_managed_p_name);
+            user_p_name.append(&mut group_inline_p_name);
+
+            let mut user_p_document: Vec<String> = Vec::new();
+            user_p_document.append(&mut user_managed_p_document);
+            user_p_document.append(&mut user_inline_p_document);
+            user_p_document.append(&mut group_managed_p_document);
+            user_p_document.append(&mut group_inline_p_document);
+
+            assert_eq!(user_p_name.len(), user_p_document.len());
+            let user_result: Vec<(String, String)> = zip(user_p_name, user_p_document).collect();
+            user_result
         }
+
         EntityType::Role => {
-            match iam_service::list_attached_role_policies(&client, args.entity_name).await {
-                Ok(r) => r,
-                Err(e) => panic!("{:?}", e),
-            }
+            let role_managed_p =
+                iam_service::list_attached_role_policies(&client, &args.entity_name)
+                    .await
+                    .unwrap()
+                    .unwrap();
+
+            let role_managed_p_document = role_managed_p.iter().map(|a_p| async {
+                let policy = iam_service::get_policy(&client, a_p.clone()).await.unwrap();
+                let policy_document = iam_service::get_policy_version(&client, policy)
+                    .await
+                    .unwrap()
+                    .document
+                    .unwrap();
+                policy_document
+            });
+            let mut role_managed_p_document: Vec<String> = join_all(role_managed_p_document).await;
+
+            let mut role_managed_p_name: Vec<String> = role_managed_p
+                .iter()
+                .map(|p| p.policy_name.clone().unwrap())
+                .collect();
+
+            // role attached inline policy
+            let mut role_inline_p_name = iam_service::list_role_policies(&client, &args.entity_name)
+                .await
+                .unwrap();
+
+            let role_inline_p_document = role_inline_p_name.iter().map(|p_n| async {
+                let policy_document = iam_service::get_role_policy(&client, &args.entity_name, p_n)
+                    .await
+                    .unwrap();
+                policy_document
+            });
+            let mut role_inline_p_document: Vec<String> = join_all(role_inline_p_document).await;
+
+            let mut role_p_name: Vec<String> = Vec::new();
+            role_p_name.append(&mut role_managed_p_name);
+            role_p_name.append(&mut role_inline_p_name);
+
+            let mut role_p_document: Vec<String> = Vec::new();
+            role_p_document.append(&mut role_managed_p_document);
+            role_p_document.append(&mut role_inline_p_document);
+
+            assert_eq!(role_p_name.len(), role_p_document.len());
+            let role_result: Vec<(String, String)> = zip(role_p_name, role_p_document).collect();
+            role_result
         }
     };
 
-    let attached_policies = attached_policies.expect("None here shouldn't happen");
-    // println!("{:?}", attached_policies);
 
-    let allowing_policies = attached_policies.clone()
-        .into_iter()
-        .map(|a_p: AttachedPolicy| async {
-            let policy = match iam_service::get_policy(&client, a_p).await {
-                Ok(p) => p,
-                Err(e) => panic!("{:?}", e),
-            };
+    //println!("{:?}", attached_policy_pairs);
 
-            match iam_service::get_policy_version(&client, policy).await {
-                Ok(p_v) => p_v,
-                Err(e) => panic!("{:?}", e),
-            }
-        });
-    // .filter() // Vec<PolicyVersion> -> Vec<PolicyVersion> that contains action
-    let allowing_policies: Vec<PolicyVersion> = join_all(allowing_policies).await;
+    println!("{:?}", attached_policy_pairs.clone().len());
 
-    //println!("{:?}", allowing_policies);
-
-    let allowing_policies_json: Vec<Value> = allowing_policies
+    let decoded_policy_pairs: Vec<(String, Value)> = attached_policy_pairs
         .iter()
-        .filter_map(|policy_version| {
-            policy_version.document.as_ref().map(|doc| {
-                let decoded = decode(doc).expect("Failed to decode document");
-                let json: Value = serde_json::from_str(&decoded).expect("Failed to parse JSON");
-                json
-            })
+        .filter_map(|(policy_name, policy_document)| {
+            let decoded = decode(policy_document).ok()?;
+            let json: Value = serde_json::from_str(&decoded).ok()?;
+            Some((policy_name.clone(), json))
         })
-        .collect();
+        .collect(); 
 
+    println!("{:?}", attached_policy_pairs.clone().len());
 
-    println!("{:?}", attached_policies.clone().len());
-    println!("{:?}", allowing_policies_json.clone().len());
-    let policies_iter = zip(attached_policies.clone(), allowing_policies_json);
+    let policies_iter = decoded_policy_pairs.iter();
 
     for (attached_policy, policy_json) in policies_iter {
         let statements = policy_json
@@ -172,12 +292,19 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
             .expect("Statment in a policy is expected")
             .as_array()
             .expect("Statment is always an array");
-        println!("[*] Checking policy : {}", attached_policy.policy_name().unwrap());
+        println!(
+            "[*] Checking policy : {}",
+            attached_policy
+        );
 
         for statement in statements {
             if check_action_in_statment(statement, &args.action_name) {
                 match to_string_pretty(statement) {
-                    Ok(pretty) => println!("Statement : \n{}\nallowed {}", pretty, args.action_name.clone()),
+                    Ok(pretty) => println!(
+                        "Statement : \n{}\nallowed {}",
+                        pretty,
+                        args.action_name.clone()
+                    ),
                     Err(e) => eprintln!("Pretty print error : {}", e),
                 }
             }
