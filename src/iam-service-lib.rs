@@ -1,20 +1,42 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: Apache-2.0
-
-// snippet-start:[rust.example_code.iam.scenario_getting_started.lib]
-
 use aws_sdk_iam::error::SdkError;
 use aws_sdk_iam::operation::{
-    list_attached_user_policies::*, list_attached_role_policies::*, list_groups::*, list_policies::*, list_role_policies::*,
-    list_roles::*, list_users::*, get_role::*,
+    get_policy::*, get_policy_version::*, get_role::*, list_attached_role_policies::*,
+    list_attached_user_policies::*, list_groups::*, list_policies::*, list_role_policies::*,
+    list_roles::*, list_users::*,
 };
-use aws_sdk_iam::types::{AccessKey, Policy, PolicyScopeType, Role, User, AttachedPolicy};
+use aws_sdk_iam::types::{
+    AccessKey, AttachedPolicy, Policy, PolicyScopeType, PolicyVersion, Role, User,
+};
 use aws_sdk_iam::Client as iamClient;
 use tokio::time::{sleep, Duration};
 
+pub async fn get_policy(
+    client: &iamClient,
+    policy: AttachedPolicy,
+) -> Result<Policy, SdkError<GetPolicyError>> {
+    let response = client
+        .get_policy()
+        .set_policy_arn(policy.policy_arn)
+        .send()
+        .await?;
+    let response = response.policy.unwrap();
+    Ok(response)
+}
 
+pub async fn get_policy_version(
+    client: &iamClient,
+    policy: Policy,
+) -> Result<PolicyVersion, SdkError<GetPolicyVersionError>> {
+    let response = client
+        .get_policy_version()
+        .set_policy_arn(policy.arn)
+        .set_version_id(policy.default_version_id)
+        .send()
+        .await?;
+    let response = response.policy_version.unwrap();
+    Ok(response)
+}
 
-// snippet-start:[rust.example_code.iam.service.list_roles]
 pub async fn list_roles(
     client: &iamClient,
     path_prefix: Option<String>,
@@ -30,9 +52,7 @@ pub async fn list_roles(
         .await?;
     Ok(response)
 }
-// snippet-end:[rust.example_code.iam.service.list_roles]
 
-// snippet-start:[rust.example_code.iam.service.get_role]
 pub async fn get_role(
     client: &iamClient,
     role_name: String,
@@ -40,9 +60,7 @@ pub async fn get_role(
     let response = client.get_role().role_name(role_name).send().await?;
     Ok(response)
 }
-// snippet-end:[rust.example_code.iam.service.get_role]
 
-// snippet-start:[rust.example_code.iam.service.list_users]
 pub async fn list_users(
     client: &iamClient,
     path_prefix: Option<String>,
@@ -58,10 +76,7 @@ pub async fn list_users(
         .await?;
     Ok(response)
 }
-// snippet-end:[rust.example_code.iam.service.list_users]
 
-// snippet-start:[rust.example_code.iam.service.list_policies]
-// snippet-start:[rust.example_code.iam.hello_lib]
 pub async fn list_policies(
     client: iamClient,
     path_prefix: String,
@@ -88,10 +103,7 @@ pub async fn list_policies(
 
     Ok(policy_names)
 }
-// snippet-end:[rust.example_code.iam.hello_lib]
-// snippet-end:[rust.example_code.iam.service.list_policies]
 
-// snippet-start:[rust.example_code.iam.service.list_groups]
 pub async fn list_groups(
     client: &iamClient,
     path_prefix: Option<String>,
@@ -108,9 +120,7 @@ pub async fn list_groups(
 
     Ok(response)
 }
-// snippet-end:[rust.example_code.iam.service.list_groups]
 
-// snippet-start:[rust.example_code.iam.service.list_attached_role_policies]
 pub async fn list_attached_role_policies(
     client: &iamClient,
     role_name: String,
@@ -124,7 +134,6 @@ pub async fn list_attached_role_policies(
     let attached_policies = response.attached_policies;
     Ok(attached_policies)
 }
-// snippet-end:[rust.example_code.iam.service.list_attached_role_policies]
 
 pub async fn list_attached_user_policies(
     client: &iamClient,
@@ -139,7 +148,6 @@ pub async fn list_attached_user_policies(
     Ok(attached_policies)
 }
 
-// snippet-start:[rust.example_code.iam.service.list_role_policies]
 pub async fn list_role_policies(
     client: &iamClient,
     role_name: &str,
@@ -156,5 +164,3 @@ pub async fn list_role_policies(
 
     Ok(response)
 }
-// snippet-end:[rust.example_code.iam.service.list_role_policies]
-
