@@ -6,11 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [x86_64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin, x86_64-pc-windows-gnu]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -20,36 +17,114 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-          target: ${{ matrix.target }}
+          target: x86_64-unknown-linux-gnu
           override: true
 
-      - name: Install Dependencies
-        if: matrix.target == 'x86_64-pc-windows-gnu'
-        run: sudo apt-get install -y mingw-w64
-
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Package
-        run: |
-          if [ ${{ matrix.target }} == "x86_64-unknown-linux-gnu" ]; then
-            tar -czvf your_cli_tool-linux.tar.gz -C target/${{ matrix.target }}/release your_cli_tool;
-            echo "package_name=your_cli_tool-linux.tar.gz" >> $GITHUB_ENV;
-          elif [ ${{ matrix.target }} == "x86_64-apple-darwin" ]; then
-            tar -czvf your_cli_tool-macos-x86_64.tar.gz -C target/${{ matrix.target }}/release your_cli_tool;
-            echo "package_name=your_cli_tool-macos-x86_64.tar.gz" >> $GITHUB_ENV;
-          elif [ ${{ matrix.target }} == "aarch64-apple-darwin" ]; then
-            tar -czvf your_cli_tool-macos-aarch64.tar.gz -C target/${{ matrix.target }}/release your_cli_tool;
-            echo "package_name=your_cli_tool-macos-aarch64.tar.gz" >> $GITHUB_ENV;
-          elif [ ${{ matrix.target }} == "x86_64-pc-windows-gnu" ]; then
-            zip your_cli_tool-windows.zip target/${{ matrix.target }}/release/your_cli_tool.exe;
-            echo "package_name=your_cli_tool-windows.zip" >> $GITHUB_ENV;
-          fi
+        run: tar -czvf your_cli_tool-linux.tar.gz -C target/x86_64-unknown-linux-gnu/release your_cli_tool
+        env:
+          package_name: your_cli_tool-linux.tar.gz
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ${{ env.package_name }}
-          asset_name: ${{ env.package_name }}
+          asset_path: your_cli_tool-linux.tar.gz
+          asset_name: your_cli_tool-linux.tar.gz
+          asset_content_type: application/zip
+
+  build-macos-x86_64:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-apple-darwin
+          override: true
+
+      - name: Build
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Package
+        run: tar -czvf your_cli_tool-macos-x86_64.tar.gz -C target/x86_64-apple-darwin/release your_cli_tool
+        env:
+          package_name: your_cli_tool-macos-x86_64.tar.gz
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: your_cli_tool-macos-x86_64.tar.gz
+          asset_name: your_cli_tool-macos-x86_64.tar.gz
+          asset_content_type: application/zip
+
+  build-macos-aarch64:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: aarch64-apple-darwin
+          override: true
+
+      - name: Build
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Package
+        run: tar -czvf your_cli_tool-macos-aarch64.tar.gz -C target/aarch64-apple-darwin/release your_cli_tool
+        env:
+          package_name: your_cli_tool-macos-aarch64.tar.gz
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: your_cli_tool-macos-aarch64.tar.gz
+          asset_name: your_cli_tool-macos-aarch64.tar.gz
+          asset_content_type: application/zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-pc-windows-gnu
+          override: true
+
+      - name: Install Dependencies
+        run: choco install mingw
+
+      - name: Build
+        run: cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: Package
+        run: Compress-Archive -Path target\x86_64-pc-windows-gnu\release\your_cli_tool.exe -DestinationPath your_cli_tool-windows.zip
+        env:
+          package_name: your_cli_tool-windows.zip
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: your_cli_tool-windows.zip
+          asset_name: your_cli_tool-windows.zip
           asset_content_type: application/zip
