@@ -27,7 +27,6 @@ Choose the appropriate binary for your operating system (Linux, macOS, Windows) 
 
 ## Build
 If you would like to build the project manually, you need to have Rust installed. 
-
 Follow the instructions below to build the project:
 
 ```bash
