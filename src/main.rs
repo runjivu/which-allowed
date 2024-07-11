@@ -275,6 +275,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
     // println!("{:?}", attached_policy_pairs.clone().len());
 
     let policies_iter = decoded_policy_pairs.iter();
+    let mut matching_policy = vec![];
 
     for (attached_policy, policy_json) in policies_iter {
         let statements = policy_json
@@ -292,6 +293,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
         }
 
         if !allowed_statements.is_empty() {
+            matching_policy.push(attached_policy);
             println!("[*] This policy : {}", attached_policy.bright_green().bold());
             for statement in allowed_statements {
                 match to_string_pretty(statement) {
@@ -300,6 +302,12 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
                 }
             }
         }
+
+    }
+
+    if matching_policy.is_empty() {
+        let message: &str = "[*] No policies allowed this action";
+        println!("{}", message.bright_red().bold());
     }
 
     Ok(())
