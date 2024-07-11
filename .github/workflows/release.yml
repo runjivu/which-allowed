@@ -106,3 +106,73 @@ jobs:
           asset_path: which-allowed-windows.zip
           asset_name: which-allowed-windows.zip
           asset_content_type: application/zip
+
+  build-macos-x86_64:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Xcode Command Line Tools
+        run: sudo xcode-select --install || true
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-apple-darwin
+          override: true
+
+      - name: Build
+        env:
+          CARGO_TARGET_X86_64_APPLE_DARWIN_RUSTFLAGS: "-C link-arg=-undefined -C link-arg=dynamic_lookup"
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Package
+        run: tar -czvf which-allowed-macos-x86_64.tar.gz -C target/x86_64-apple-darwin/release which-allowed
+        env:
+          package_name: which-allowed-macos-x86_64.tar.gz
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: which-allowed-macos-x86_64.tar.gz
+          asset_name: which-allowed-macos-x86_64.tar.gz
+          asset_content_type: application/gzip
+
+  build-macos-aarch64:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Xcode Command Line Tools
+        run: sudo xcode-select --install || true
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: aarch64-apple-darwin
+          override: true
+
+      - name: Build
+        env:
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS: "-C link-arg=-undefined -C link-arg=dynamic_lookup"
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Package
+        run: tar -czvf which-allowed-macos-aarch64.tar.gz -C target/aarch64-apple-darwin/release which-allowed
+        env:
+          package_name: which-allowed-macos-aarch64.tar.gz
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: which-allowed-macos-aarch64.tar.gz
+          asset_name: which-allowed-macos-aarch64.tar.gz
+          asset_content_type: application/gzip
