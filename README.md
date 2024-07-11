@@ -17,7 +17,20 @@ Options:
   -h, --help                       Print help
 ```
 
-## Build
-`cargo build --release`
 
-If you are in MAC OS X environment, you can use the binary /target/release/which-allowed.
+
+## Downloading and Using the Release
+
+You can download the pre-built binaries from the [Releases](https://github.com/runjivu/which-allowed/releases) page on GitHub. 
+Choose the appropriate binary for your operating system (Linux, macOS, Windows) and download it.
+
+## Build
+If you would like to build the project manually, you need to have Rust installed. 
+Follow the instructions below to build the project:
+
+```bash
+git clone https://github.com/runjivu/which-allowed.git
+cd which-allowed
+cargo build --release
+./target/release/which-allowed --entity-type <ENTITY_TYPE> --entity-name <ENTITY_NAME> --action-name <ACTION_NAME>
+```
