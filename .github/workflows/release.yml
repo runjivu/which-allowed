@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-apple-darwin, x86_64-pc-windows-gnu]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          if [ ${{ matrix.target }} == "x86_64-unknown-linux-gnu" ]; then
+            tar -czvf your_cli_tool-linux.tar.gz -C target/${{ matrix.target }}/release your_cli_tool;
+            echo "package_name=your_cli_tool-linux.tar.gz" >> $GITHUB_ENV;
+          elif [ ${{ matrix.target }} == "x86_64-apple-darwin" ]; then
+            tar -czvf your_cli_tool-macos.tar.gz -C target/${{ matrix.target }}/release your_cli_tool;
+            echo "package_name=your_cli_tool-macos.tar.gz" >> $GITHUB_ENV;
+          elif [ ${{ matrix.target }} == "x86_64-pc-windows-gnu" ]; then
+            zip your_cli_tool-windows.zip target/${{ matrix.target }}/release/your_cli_tool.exe;
+            echo "package_name=your_cli_tool-windows.zip" >> $GITHUB_ENV;
+          fi
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ${{ env.package_name }}
+          asset_name: ${{ env.package_name }}
+          asset_content_type: application/zip
+
