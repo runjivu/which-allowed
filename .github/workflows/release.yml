@@ -53,6 +53,8 @@ jobs:
           asset_path: which-allowed-linux.tar.gz
           asset_name: which-allowed-linux.tar.gz
           asset_content_type: application/gzip
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
   build-macos-x86_64:
     runs-on: macos-latest
@@ -93,6 +95,8 @@ jobs:
           asset_path: which-allowed-macos-x86_64.tar.gz
           asset_name: which-allowed-macos-x86_64.tar.gz
           asset_content_type: application/gzip
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
   build-macos-aarch64:
     runs-on: macos-latest
@@ -133,6 +137,8 @@ jobs:
           asset_path: which-allowed-macos-aarch64.tar.gz
           asset_name: which-allowed-macos-aarch64.tar.gz
           asset_content_type: application/gzip
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
   build-windows:
     runs-on: windows-latest
@@ -165,3 +171,5 @@ jobs:
           asset_path: which-allowed-windows.zip
           asset_name: which-allowed-windows.zip
           asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
