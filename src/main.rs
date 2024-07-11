@@ -11,14 +11,17 @@ use std::iter::zip;
 use std::str::FromStr;
 use tokio;
 use urlencoding::decode;
+use colored::*;
 
-const PATH_PREFIX_HELP: &str = "The path prefix for filtering the results.";
 const ENTITY_TYPE: &str = "The type of IAM Entity: Is Either \"role\" or \"user\".";
 const ENTITY_NAME: &str = "The name of IAM Entity";
 const ACTION_NAME: &str = "The name of action IAM entity performed";
+const ABOUT: &str = r#"CLI tool to check allowed actions for IAM entities.
+Use it inside an environment where the cli can retrieve IAM credentials, 
+which has IAMReadOnly or above permissions."#;
 
 #[derive(Debug, clap::Parser)]
-#[command(about)]
+#[command(about=ABOUT)]
 struct WhichAllowedArgs {
     #[arg(long, help=ENTITY_TYPE)]
     pub entity_type: EntityType,
@@ -49,21 +52,8 @@ impl FromStr for EntityType {
     }
 }
 
-// #[derive(Serialize, Deserialize, Debug)]
-// struct Statement {
-//     Sid: String,
-//     Effect: String,
-//     Action: String,
-//     Resource: String,
-// }
-//
-// #[derive(Serialize, Deserialize, Debug)]
-// struct PolicyDocument {
-//     Version: String,
-//     Statement: Vec<Statement>,
-// }
 
-fn check_action_in_statment(statement: &Value, action_name: &String) -> bool {
+fn check_action_in_statement(statement: &Value, action_name: &String) -> bool {
     if statement
         .get("Effect")
         .expect("Effect is expected")
@@ -271,7 +261,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
 
     //println!("{:?}", attached_policy_pairs);
 
-    println!("{:?}", attached_policy_pairs.clone().len());
+    //println!("{:?}", attached_policy_pairs.clone().len());
 
     let decoded_policy_pairs: Vec<(String, Value)> = attached_policy_pairs
         .iter()
@@ -282,7 +272,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
         })
         .collect(); 
 
-    println!("{:?}", attached_policy_pairs.clone().len());
+    // println!("{:?}", attached_policy_pairs.clone().len());
 
     let policies_iter = decoded_policy_pairs.iter();
 
@@ -292,20 +282,21 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
             .expect("Statment in a policy is expected")
             .as_array()
             .expect("Statment is always an array");
-        println!(
-            "[*] Checking policy : {}",
-            attached_policy
-        );
+
+        let mut allowed_statements = vec![];
 
         for statement in statements {
-            if check_action_in_statment(statement, &args.action_name) {
+            if check_action_in_statement(statement, &args.action_name) {
+                allowed_statements.push(statement);
+            }
+        }
+
+        if !allowed_statements.is_empty() {
+            println!("[*] This policy : {}", attached_policy.bright_green().bold());
+            for statement in allowed_statements {
                 match to_string_pretty(statement) {
-                    Ok(pretty) => println!(
-                        "Statement : \n{}\nallowed {}",
-                        pretty,
-                        args.action_name.clone()
-                    ),
-                    Err(e) => eprintln!("Pretty print error : {}", e),
+                    Ok(pretty) => println!("Statement:\n{}\nAllowed {}\n", pretty.cyan(), args.action_name.clone()),
+                    Err(e) => eprintln!("Pretty print error: {}", e),
                 }
             }
         }
