@@ -24,16 +24,16 @@ jobs:
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Package
-        run: tar -czvf your_cli_tool-linux.tar.gz -C target/x86_64-unknown-linux-gnu/release your_cli_tool
+        run: tar -czvf which-allowed-linux.tar.gz -C target/x86_64-unknown-linux-gnu/release which-allowed
         env:
-          package_name: your_cli_tool-linux.tar.gz
+          package_name: which-allowed-linux.tar.gz
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: your_cli_tool-linux.tar.gz
-          asset_name: your_cli_tool-linux.tar.gz
+          asset_path: which-allowed-linux.tar.gz
+          asset_name: which-allowed-linux.tar.gz
           asset_content_type: application/zip
 
   build-macos-x86_64:
@@ -54,16 +54,16 @@ jobs:
         run: cargo build --release --target x86_64-apple-darwin
 
       - name: Package
-        run: tar -czvf your_cli_tool-macos-x86_64.tar.gz -C target/x86_64-apple-darwin/release your_cli_tool
+        run: tar -czvf which-allowed-macos-x86_64.tar.gz -C target/x86_64-apple-darwin/release which-allowed
         env:
-          package_name: your_cli_tool-macos-x86_64.tar.gz
+          package_name: which-allowed-macos-x86_64.tar.gz
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: your_cli_tool-macos-x86_64.tar.gz
-          asset_name: your_cli_tool-macos-x86_64.tar.gz
+          asset_path: which-allowed-macos-x86_64.tar.gz
+          asset_name: which-allowed-macos-x86_64.tar.gz
           asset_content_type: application/zip
 
   build-macos-aarch64:
@@ -84,16 +84,16 @@ jobs:
         run: cargo build --release --target aarch64-apple-darwin
 
       - name: Package
-        run: tar -czvf your_cli_tool-macos-aarch64.tar.gz -C target/aarch64-apple-darwin/release your_cli_tool
+        run: tar -czvf which-allowed-macos-aarch64.tar.gz -C target/aarch64-apple-darwin/release which-allowed
         env:
-          package_name: your_cli_tool-macos-aarch64.tar.gz
+          package_name: which-allowed-macos-aarch64.tar.gz
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: your_cli_tool-macos-aarch64.tar.gz
-          asset_name: your_cli_tool-macos-aarch64.tar.gz
+          asset_path: which-allowed-macos-aarch64.tar.gz
+          asset_name: which-allowed-macos-aarch64.tar.gz
           asset_content_type: application/zip
 
   build-windows:
@@ -117,14 +117,14 @@ jobs:
         run: cargo build --release --target x86_64-pc-windows-gnu
 
       - name: Package
-        run: Compress-Archive -Path target\x86_64-pc-windows-gnu\release\your_cli_tool.exe -DestinationPath your_cli_tool-windows.zip
+        run: Compress-Archive -Path target\x86_64-pc-windows-gnu\release\which-allowed.exe -DestinationPath which-allowed-windows.zip
         env:
-          package_name: your_cli_tool-windows.zip
+          package_name: which-allowed-windows.zip
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: your_cli_tool-windows.zip
-          asset_name: your_cli_tool-windows.zip
+          asset_path: which-allowed-windows.zip
+          asset_name: which-allowed-windows.zip
           asset_content_type: application/zip
