@@ -6,49 +6,10 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [x86_64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin, x86_64-pc-windows-gnu]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
-
-      - name: Install Dependencies
-        if: matrix.target == 'x86_64-pc-windows-gnu'
-        run: sudo apt-get install -y mingw-w64
-
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Package
-        run: |
-          if [ ${{ matrix.target }} == "x86_64-unknown-linux-gnu" ]; then
-            tar -czvf which-allowed-linux.tar.gz -C target/${{ matrix.target }}/release which-allowed;
-            echo "package_name=which-allowed-linux.tar.gz" >> $GITHUB_ENV;
-          elif [ ${{ matrix.target }} == "x86_64-apple-darwin" ]; then
-            tar -czvf which-allowed-macos-x86_64.tar.gz -C target/${{ matrix.target }}/release which-allowed;
-            echo "package_name=which-allowed-macos-x86_64.tar.gz" >> $GITHUB_ENV;
-          elif [ ${{ matrix.target }} == "aarch64-apple-darwin" ]; then
-            tar -czvf which-allowed-macos-aarch64.tar.gz -C target/${{ matrix.target }}/release which-allowed;
-            echo "package_name=which-allowed-macos-aarch64.tar.gz" >> $GITHUB_ENV;
-          elif [ ${{ matrix.target }} == "x86_64-pc-windows-gnu" ]; then
-            zip which-allowed-windows.zip target/${{ matrix.target }}/release/which-allowed.exe;
-            echo "package_name=which-allowed-windows.zip" >> $GITHUB_ENV;
-          fi
-
   create_release:
     runs-on: ubuntu-latest
-    needs: build
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -64,54 +25,44 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  upload_assets:
+  build-linux:
     runs-on: ubuntu-latest
-    needs: [build, create_release]
+    needs: create_release
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Upload Linux Asset
-        if: env.package_name == 'which-allowed-linux.tar.gz'
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          override: true
+
+      - name: Build
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Package
+        run: tar -czvf which-allowed-linux.tar.gz -C target/x86_64-unknown-linux-gnu/release which-allowed
+
+      - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: which-allowed-linux.tar.gz
           asset_name: which-allowed-linux.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload macOS x86_64 Asset
-        if: env.package_name == 'which-allowed-macos-x86_64.tar.gz'
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: which-allowed-macos-x86_64.tar.gz
-          asset_name: which-allowed-macos-x86_64.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload macOS aarch64 Asset
-        if: env.package_name == 'which-allowed-macos-aarch64.tar.gz'
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: which-allowed-macos-aarch64.tar.gz
-          asset_name: which-allowed-macos-aarch64.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload Windows Asset
-        if: env.package_name == 'which-allowed-windows.zip'
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: which-allowed-windows.zip
-          asset_name: which-allowed-windows.zip
-          asset_content_type: application/zip
-
   build-macos-x86_64:
     runs-on: macos-latest
+    needs: create_release
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: brew install cmake
 
       - name: Install Xcode Command Line Tools
         run: sudo xcode-select --install || true
@@ -134,8 +85,6 @@ jobs:
 
       - name: Package
         run: tar -czvf which-allowed-macos-x86_64.tar.gz -C target/x86_64-apple-darwin/release which-allowed
-        env:
-          package_name: which-allowed-macos-x86_64.tar.gz
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -147,9 +96,13 @@ jobs:
 
   build-macos-aarch64:
     runs-on: macos-latest
+    needs: create_release
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: brew install cmake
 
       - name: Install Xcode Command Line Tools
         run: sudo xcode-select --install || true
@@ -172,8 +125,6 @@ jobs:
 
       - name: Package
         run: tar -czvf which-allowed-macos-aarch64.tar.gz -C target/aarch64-apple-darwin/release which-allowed
-        env:
-          package_name: which-allowed-macos-aarch64.tar.gz
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -182,3 +133,35 @@ jobs:
           asset_path: which-allowed-macos-aarch64.tar.gz
           asset_name: which-allowed-macos-aarch64.tar.gz
           asset_content_type: application/gzip
+
+  build-windows:
+    runs-on: windows-latest
+    needs: create_release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-pc-windows-gnu
+          override: true
+
+      - name: Install Dependencies
+        run: choco install mingw
+
+      - name: Build
+        run: cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: Package
+        run: Compress-Archive -Path target\x86_64-pc-windows-gnu\release\which-allowed.exe -DestinationPath which-allowed-windows.zip
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: which-allowed-windows.zip
+          asset_name: which-allowed-windows.zip
+          asset_content_type: application/zip
