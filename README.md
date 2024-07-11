@@ -1,10 +1,10 @@
 ## which-allowed
-A cli tool to check which policy allowed actions for IAM entities.
+A cli tool to check which policy allowed actions for AWS IAM entities.
 
 
 ## Usage
 ```
-CLI tool to check which policy allowed actions for IAM entities.
+CLI tool to check which policy allowed actions for AWS IAM entities.
 Use it inside an environment where the cli can retrieve IAM credentials,
 which has IAMReadOnly or above permissions.
 
