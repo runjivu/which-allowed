@@ -1,17 +1,18 @@
 use aws_sdk_iam::operation::list_policies::ListPoliciesError;
-use aws_sdk_iam::types::{AttachedPolicy, Policy, PolicyVersion};
-use aws_sdk_iam::{error::SdkError, operation::get_policy};
+use aws_sdk_iam::types::AttachedPolicy;
+use aws_sdk_iam::error::SdkError;
 use clap::{Parser, ValueEnum};
 use futures::future::join_all;
-use futures::stream::Zip;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use serde_json::{to_string_pretty, Value};
 use std::iter::zip;
 use std::str::FromStr;
 use tokio;
 use urlencoding::decode;
 use colored::*;
+use inquire::{Select, Text};
+use std::fmt::Display;
+use aws_sdk_iam::Client as iamClient;
 
 const ENTITY_TYPE: &str = "The type of IAM Entity: Is Either \"role\" or \"user\".";
 const ENTITY_NAME: &str = "The name of IAM Entity";
@@ -24,11 +25,11 @@ which has IAMReadOnly or above permissions."#;
 #[command(about=ABOUT)]
 struct WhichAllowedArgs {
     #[arg(long, help=ENTITY_TYPE)]
-    pub entity_type: EntityType,
+    pub entity_type: Option<EntityType>,
     #[arg(long, help=ENTITY_NAME)]
-    pub entity_name: String,
+    pub entity_name: Option<String>,
     #[arg(long, help=ACTION_NAME)]
-    pub action_name: String,
+    pub action_name: Option<String>,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -52,51 +53,15 @@ impl FromStr for EntityType {
     }
 }
 
-
-fn check_action_in_statement(statement: &Value, action_name: &String) -> bool {
-    if statement
-        .get("Effect")
-        .expect("Effect is expected")
-        .as_str()
-        == Some("Allow")
-    {
-        let action = statement
-            .get("Action")
-            .expect("Action is expected in statement");
-
-        match action {
-            Value::String(s) => {
-                if s == action_name {
-                    return true;
-                }
-                let pattern = s.replace("*", ".*");
-                let re = Regex::new(&pattern).expect("Invalid regex pattern");
-                re.is_match(&action_name)
-            }
-
-            Value::Array(arr) => {
-                for action_elem in arr.clone() {
-                    let action_str = action_elem
-                        .as_str()
-                        .expect("Action Array must be an array of string");
-                    if action_str == action_name {
-                        return true;
-                    }
-                    let pattern = action_str.replace("*", ".*");
-                    let re = Regex::new(&pattern).expect("Invalid regex pattern");
-                    if re.is_match(&action_name) {
-                        return true;
-                    }
-                }
-                false
-            }
-
-            _ => false,
+impl Display for EntityType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            EntityType::User=> write!(f, "user"),
+            EntityType::Role=> write!(f, "role"),
         }
-    } else {
-        false
     }
 }
+
 
 #[tokio::main]
 async fn main() -> Result<(), SdkError<ListPoliciesError>> {
@@ -104,11 +69,36 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
     let client = aws_sdk_iam::Client::new(&sdk_config);
     let args = WhichAllowedArgs::parse();
 
-    let attached_policy_pairs: Vec<(String, String)> = match args.entity_type {
+    let entity_type = match args.entity_type {
+        Some(e_t) => e_t,
+        None => Select::new(
+            "Select the type of IAM Entity:",
+            vec![EntityType::User, EntityType::Role],
+        )
+        .prompt()
+        .unwrap(),
+    };
+
+    
+    let entity_name = if let Some(e_n) = args.entity_name {
+        e_n
+    } else {
+        set_entity_name(&client, &entity_type).await
+    };
+
+    let action_name = match args.action_name {
+        Some(a_n) => a_n,
+        None => Text::new("Enter the name of IAM action:")
+            .prompt()
+            .unwrap(),
+    };
+
+
+    let attached_policy_pairs: Vec<(String, String)> = match entity_type {
         EntityType::User => {
             // user attached managed policy (both aws and customer managed)
             let user_managed_p =
-                iam_service::list_attached_user_policies(&client, &args.entity_name)
+                iam_service::list_attached_user_policies(&client, &entity_name)
                     .await
                     .unwrap()
                     .unwrap();
@@ -130,12 +120,12 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
                 .collect();
 
             // user attached inline policy
-            let mut user_inline_p_name = iam_service::list_user_policies(&client, &args.entity_name)
+            let mut user_inline_p_name = iam_service::list_user_policies(&client, &entity_name)
                 .await
                 .unwrap();
 
             let user_inline_p_document = user_inline_p_name.iter().map(|p_n| async {
-                let policy_document = iam_service::get_user_policy(&client, &args.entity_name, p_n)
+                let policy_document = iam_service::get_user_policy(&client, &entity_name, p_n)
                     .await
                     .unwrap();
                 policy_document
@@ -143,7 +133,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
             let mut user_inline_p_document: Vec<String> = join_all(user_inline_p_document).await;
 
             // group attached managed policies
-            let groups = iam_service::list_groups_for_user(&client, &args.entity_name)
+            let groups = iam_service::list_groups_for_user(&client, &entity_name)
                 .await
                 .unwrap();
 
@@ -210,7 +200,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
 
         EntityType::Role => {
             let role_managed_p =
-                iam_service::list_attached_role_policies(&client, &args.entity_name)
+                iam_service::list_attached_role_policies(&client, &entity_name)
                     .await
                     .unwrap()
                     .unwrap();
@@ -232,12 +222,12 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
                 .collect();
 
             // role attached inline policy
-            let mut role_inline_p_name = iam_service::list_role_policies(&client, &args.entity_name)
+            let mut role_inline_p_name = iam_service::list_role_policies(&client, &entity_name)
                 .await
                 .unwrap();
 
             let role_inline_p_document = role_inline_p_name.iter().map(|p_n| async {
-                let policy_document = iam_service::get_role_policy(&client, &args.entity_name, p_n)
+                let policy_document = iam_service::get_role_policy(&client, &entity_name, p_n)
                     .await
                     .unwrap();
                 policy_document
@@ -287,7 +277,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
         let mut allowed_statements = vec![];
 
         for statement in statements {
-            if check_action_in_statement(statement, &args.action_name) {
+            if check_action_in_statement(statement, &action_name) {
                 allowed_statements.push(statement);
             }
         }
@@ -297,7 +287,7 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
             println!("[*] This policy : {}", attached_policy.bright_green().bold());
             for statement in allowed_statements {
                 match to_string_pretty(statement) {
-                    Ok(pretty) => println!("Statement:\n{}\nAllowed {}\n", pretty.cyan(), args.action_name.clone()),
+                    Ok(pretty) => println!("Statement:\n{}\nAllowed {}\n", pretty.cyan(), action_name.clone()),
                     Err(e) => eprintln!("Pretty print error: {}", e),
                 }
             }
@@ -312,3 +302,91 @@ async fn main() -> Result<(), SdkError<ListPoliciesError>> {
 
     Ok(())
 }
+
+async fn set_entity_name(client: &iamClient, entity_type: &EntityType) -> String {
+    let entity_list: Vec<String> = match entity_type {
+        EntityType::Role => {
+            let vec_role = iam_service::list_roles(client, None, None, Some(1000))
+            .await
+            .unwrap()
+            .roles;
+
+            vec_role.iter()
+                .map(|r| r.role_name.clone())
+                .collect()
+        },
+        EntityType::User => {
+            let vec_user = iam_service::list_users(client, None, None, Some(1000))
+            .await
+            .unwrap()
+            .users;
+
+            vec_user.iter()
+                .map(|u| u.user_name.clone())
+                .collect()
+        },
+    };
+
+    let autocomplete_closure = move |input: &str| {
+            Ok(
+                entity_list.iter()
+                .filter(|e| e.to_lowercase().contains(&input.to_lowercase()))
+                .map(|e| e.to_string())
+                .collect::<Vec<String>>())
+    };
+
+    let result = Text::new("Enter the name of IAM Entity:")
+        .with_page_size(5)
+        .with_autocomplete(autocomplete_closure)
+        .prompt()
+        .unwrap();
+
+    result
+
+}
+
+fn check_action_in_statement(statement: &Value, action_name: &String) -> bool {
+    if statement
+        .get("Effect")
+        .expect("Effect is expected")
+        .as_str()
+        == Some("Allow")
+    {
+        let action = statement
+            .get("Action")
+            .expect("Action is expected in statement");
+
+        match action {
+            Value::String(s) => {
+                if s == action_name {
+                    return true;
+                }
+                let pattern = s.replace("*", ".*");
+                let re = Regex::new(&pattern).expect("Invalid regex pattern");
+                re.is_match(&action_name)
+            }
+
+            Value::Array(arr) => {
+                for action_elem in arr.clone() {
+                    let action_str = action_elem
+                        .as_str()
+                        .expect("Action Array must be an array of string");
+                    if action_str == action_name {
+                        return true;
+                    }
+                    let pattern = action_str.replace("*", ".*");
+                    let re = Regex::new(&pattern).expect("Invalid regex pattern");
+                    if re.is_match(&action_name) {
+                        return true;
+                    }
+                }
+                false
+            }
+
+            _ => false,
+        }
+    } else {
+        false
+    }
+}
+

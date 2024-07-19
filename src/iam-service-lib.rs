@@ -7,10 +7,9 @@ use aws_sdk_iam::operation::{
     list_user_policies::*, list_users::*,
 };
 use aws_sdk_iam::types::{
-    AccessKey, AttachedPolicy, Group, Policy, PolicyScopeType, PolicyVersion, Role, User,
+    AttachedPolicy, Group, Policy, PolicyScopeType, PolicyVersion, Role, User,
 };
 use aws_sdk_iam::Client as iamClient;
-use tokio::time::{sleep, Duration};
 
 pub async fn get_policy(
     client: &iamClient,
@@ -108,6 +107,8 @@ pub async fn get_role(
     let response = client.get_role().role_name(role_name).send().await?;
     Ok(response)
 }
+
+
 
 pub async fn list_users(
     client: &iamClient,
