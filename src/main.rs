@@ -14,7 +14,7 @@ use inquire::{Select, Text};
 use std::fmt::Display;
 use aws_sdk_iam::Client as iamClient;
 
-const ENTITY_TYPE: &str = "The type of IAM Entity: Is Either \"role\" or \"user\".";
+const ENTITY_TYPE: &str = "The type of IAM Entity";
 const ENTITY_NAME: &str = "The name of IAM Entity";
 const ACTION_NAME: &str = "The name of action IAM entity performed";
 const ABOUT: &str = r#"CLI tool to check allowed actions for IAM entities.

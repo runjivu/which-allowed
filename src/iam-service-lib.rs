@@ -7,7 +7,7 @@ use aws_sdk_iam::operation::{
     list_user_policies::*, list_users::*,
 };
 use aws_sdk_iam::types::{
-    AttachedPolicy, Group, Policy, PolicyScopeType, PolicyVersion, Role, User,
+    AccessKey, AttachedPolicy, Group, Policy, PolicyScopeType, PolicyVersion, Role, User,
 };
 use aws_sdk_iam::Client as iamClient;
 
